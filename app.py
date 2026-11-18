@@ -2297,7 +2297,8 @@ def _install_drain_signal_handler():
 def _write_resume_manifest(job_id, cmd, priority, user_id, reservation_id, watermark,
                            webhook_url=None, webhook_secret=None, base_url=None,
                            partial=None, source_cap_minutes=None, skip_statics=False,
-                           via_api_key=False, lane=None, submitted_at=None, topup=False):
+                           via_api_key=False, lane=None, submitted_at=None, topup=False,
+                           gta_highlight_mode=False):
     try:
         path = os.path.join(OUTPUT_DIR, job_id, _RESUME_FILE)
         # Atomic like every manifest write: the other instance reads them.
@@ -2327,6 +2328,9 @@ def _write_resume_manifest(job_id, cmd, priority, user_id, reservation_id, water
                 "lane": lane or _queue_mode.NORMAL,
                 "submitted_at": submitted_at,
                 "topup": bool(topup),
+                # Per-job GTA mode must survive a worker restart; old manifests
+                # safely default to the standard pipeline.
+                "gta_highlight_mode": bool(gta_highlight_mode),
         })
     except Exception as e:
         print(f"⚠️ Could not write resume manifest for {job_id}: {e}")
@@ -2476,6 +2480,7 @@ def _register_resumed(picked) -> int:
             env["DOWNLOAD_SKIP_STATICS"] = "1"
         else:
             env.pop("DOWNLOAD_SKIP_STATICS", None)
+        env["GTA_HIGHLIGHT_MODE"] = "1" if m.get("gta_highlight_mode") else "0"
 
         priority = int(m.get("priority", 2))
         # Whatever a remote worker was doing for the instance that held this
@@ -5801,6 +5806,7 @@ async def process_endpoint(
     max_minutes: Optional[str] = Form(None),
     source_start: Optional[str] = Form(None),
     source_end: Optional[str] = Form(None),
+    gta_highlight_mode: Optional[str] = Form(None),
 ):
     api_key = await resolve_gemini(request)
     if not api_key and not (llm_backend.active() and not BILLING_ENABLED):
@@ -5835,6 +5841,9 @@ async def process_endpoint(
         max_minutes = body.get("max_minutes")
         source_start = body.get("source_start")
         source_end = body.get("source_end")
+        gta_highlight_mode = body.get("gta_highlight_mode")
+
+    gta_mode_enabled = str(gta_highlight_mode).strip().lower() in ("1", "true", "yes", "on")
 
     # Normalize output format (auto = keep pipeline default).
     if output_format not in ("vertical", "horizontal", "square"):
@@ -5916,6 +5925,11 @@ async def process_endpoint(
     # probe above already gets this right.
     cmd = [sys.executable, "-u", "main.py"] # -u for unbuffered
     env = child_env()
+    # Always override the deployment-wide value per job. A missing/false
+    # request flag keeps ordinary uploads on the standard pipeline.
+    env["GTA_HIGHLIGHT_MODE"] = "1" if gta_mode_enabled else "0"
+    if gta_mode_enabled:
+        print(f"[gta-highlight] job={job_id} enabled")
     if api_key:
         env["GEMINI_API_KEY"] = api_key # Override with key from request
     else:
@@ -6171,7 +6185,8 @@ async def process_endpoint(
                            source_cap_minutes=source_cap, skip_statics=skip_statics,
                            via_api_key=jobs[job_id]['via_api_key'],
                            lane=jobs[job_id]['lane'], submitted_at=jobs[job_id]['submitted_at'],
-                           topup=jobs[job_id]['topup'])
+                           topup=jobs[job_id]['topup'],
+                           gta_highlight_mode=gta_mode_enabled)
 
     _enqueue_job(job_id, priority)
     if _saturation_on():
