@@ -144,6 +144,8 @@ export default function MediaInput({ onProcess, isProcessing }) {
         } else if (mode === 'file' && file && !fileTooShort) {
             onProcess({ type: 'file', payload: file, acknowledged: true, outputFormat, ...advanced });
         }
+        // One-shot opt-in: the next upload starts in standard mode.
+        setGtaHighlightMode(false);
     };
 
     const handleDrop = (e) => {
