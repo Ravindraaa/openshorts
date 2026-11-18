@@ -49,6 +49,9 @@ export default function MediaInput({ onProcess, isProcessing }) {
     const [targetClips, setTargetClips] = useState('');
     const [clipMinSeconds, setClipMinSeconds] = useState('');
     const [clipMaxSeconds, setClipMaxSeconds] = useState('');
+    // Opt-in, per-upload GTA highlight pipeline. Never persisted: normal uploads
+    // remain on the standard pipeline unless the user deliberately enables it.
+    const [gtaHighlightMode, setGtaHighlightMode] = useState(false);
     // Auto-hook: burn the AI hook text into every clip. On by default; the
     // choice persists so turning it off sticks across sessions.
     const [autoHook, setAutoHook] = useState(() => {
@@ -124,6 +127,7 @@ export default function MediaInput({ onProcess, isProcessing }) {
             targetClips: targetClips || null,
             clipMinSeconds: clipMinSeconds || null,
             clipMaxSeconds: clipMaxSeconds || null,
+            gtaHighlightMode,
             autoHook,
             autoHookStyle,
             layout,
@@ -354,6 +358,22 @@ export default function MediaInput({ onProcess, isProcessing }) {
                                 Targets, not guarantees: the AI returns fewer clips when the
                                 material doesn't hold them. Leave blank to let it decide.
                             </p>
+                            <label className="col-span-1 sm:col-span-3 flex items-start gap-3 rounded-input border border-rule2 p-3 cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    checked={gtaHighlightMode}
+                                    onChange={(e) => setGtaHighlightMode(e.target.checked)}
+                                    className="mt-0.5 accent-[var(--color-accent)]"
+                                />
+                                <span className="min-w-0">
+                                    <span className="block text-sm font-medium text-ink2">GTA Highlight Mode</span>
+                                    <span className="block mt-1 text-xs leading-relaxed text-muted">
+                                        For GTA gameplay only. Finds high-action moments, then asks Gemini to
+                                        approve the strongest clips. It may return fewer clips or none rather
+                                        than use weak moments.
+                                    </span>
+                                </span>
+                            </label>
                             <div className="col-span-1 sm:col-span-3 flex flex-wrap items-center justify-between gap-3 pt-3 sm:pt-1 border-t border-rule">
                                 <span className="text-xs text-ink2">vertical layout</span>
                                 <select
