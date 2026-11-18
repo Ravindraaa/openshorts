@@ -2480,7 +2480,7 @@ def _register_resumed(picked) -> int:
             env["DOWNLOAD_SKIP_STATICS"] = "1"
         else:
             env.pop("DOWNLOAD_SKIP_STATICS", None)
-        env["GTA_HIGHLIGHT_MODE"] = "1" if m.get("gta_highlight_mode") else "0"
+        env["GTA_HIGHLIGHT_MODE"] = "1"  # GTA-only clipper: force GTA Highlight Mode on for resumed jobs.
 
         priority = int(m.get("priority", 2))
         # Whatever a remote worker was doing for the instance that held this
@@ -5843,7 +5843,7 @@ async def process_endpoint(
         source_end = body.get("source_end")
         gta_highlight_mode = body.get("gta_highlight_mode")
 
-    gta_mode_enabled = str(gta_highlight_mode).strip().lower() in ("1", "true", "yes", "on")
+    gta_mode_enabled = True  # This OpenShorts instance is dedicated to GTA gameplay clipping.
 
     # Normalize output format (auto = keep pipeline default).
     if output_format not in ("vertical", "horizontal", "square"):
@@ -5927,9 +5927,8 @@ async def process_endpoint(
     env = child_env()
     # Always override the deployment-wide value per job. A missing/false
     # request flag keeps ordinary uploads on the standard pipeline.
-    env["GTA_HIGHLIGHT_MODE"] = "1" if gta_mode_enabled else "0"
-    if gta_mode_enabled:
-        print(f"[gta-highlight] job={job_id} enabled")
+    env["GTA_HIGHLIGHT_MODE"] = "1"  # Always use the GTA highlight pipeline.
+    print(f"[gta-highlight] job={job_id} enabled (always-on GTA mode)")
     if api_key:
         env["GEMINI_API_KEY"] = api_key # Override with key from request
     else:
