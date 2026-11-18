@@ -17,19 +17,20 @@ The detector only proposes candidates; Gemini is the semantic verifier. Activity
 - `tests/test_gta_highlight.py`
 - `tests/test_gta_highlight_gemini.py`
 
-## Enable carefully
+## Enable per upload
 
-The current switch is a **backend-wide environment variable**, not a per-upload UI setting. When `GTA_HIGHLIGHT_MODE=1`, every job processed by that backend instance will use GTA selection. Do not leave it enabled while processing ordinary talking-head, podcast, or other non-GTA videos.
+Open **Advanced options** in the dashboard and tick **GTA Highlight Mode** only for a GTA gameplay upload. The option is off by default and is sent with that individual process request.
 
-Set these variables in the backend container environment only for a GTA-only test window:
+The API forwards the choice to that job's pipeline subprocess. Other uploads explicitly receive `GTA_HIGHLIGHT_MODE=0`, even if the backend container has a different deployment-wide value. The selected mode is also written to the job's resume manifest, so an interrupted GTA job resumes with the same setting; older manifests default to normal mode.
 
-- `GTA_HIGHLIGHT_MODE=1`
+The existing Gemini-key flow is unchanged: the dashboard sends the key in the request header, and the backend forwards it only to the processing subprocess. Do not put API keys in this file or commit them.
+
+Optional tuning variables remain deployment-level settings:
+
 - `GTA_CANDIDATE_TOP_K=8`
 - `GTA_CANDIDATE_THRESHOLD=0.28`
 - `GTA_MIN_REVIEW_SCORE=72`
 - `GTA_MAX_CLIPS=2`
-
-Remove or set `GTA_HIGHLIGHT_MODE=0` before returning to normal videos. Recreate/restart the backend after changing container environment variables. The app's existing Gemini-key forwarding should continue to populate `GEMINI_API_KEY` for the worker process; do not put API keys in this file or commit them.
 
 ## Tests
 
