@@ -1212,6 +1212,8 @@ function App() {
         // The stretch picked under the cost line (seconds); absent = whole video.
         source_start: data.sourceStart ?? null,
         source_end: data.sourceEnd ?? null,
+        // Explicit per-job opt-in; defaults off for every normal upload.
+        gta_highlight_mode: data.gtaHighlightMode ? '1' : '0',
       };
 
       if (data.type === 'url') {

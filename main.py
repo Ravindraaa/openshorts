@@ -2814,8 +2814,10 @@ if __name__ == '__main__':
             threading.Thread(target=_early_work, args=(audio_path, audio_duration),
                              daemon=True).start()
 
+        gta_highlight_mode = os.environ.get("GTA_HIGHLIGHT_MODE", "0").strip() == "1"
         use_early = (not args.skip_analysis and not args.transcript
                      and not args.prepare_only
+                     and not gta_highlight_mode
                      and os.environ.get("EARLY_AUDIO", "1").strip() != "0"
                      and not os.environ.get("MAX_SOURCE_MINUTES", "").strip()
                      and not os.path.exists(os.path.join(output_dir, TRANSCRIPT_CHECKPOINT)))
@@ -2994,15 +2996,38 @@ if __name__ == '__main__':
             transcript = None
 
         # 4. Gemini Analysis (transcript-driven, or vision for silent videos)
-        early_clips = (early_state or {}).get("clips") if early_state else None
-        if (transcript is not None and early_clips
-                and transcript is early_state["transcript"]):
-            print("♻️ Using the clips Gemini picked while the video downloaded.")
-            clips_data = early_clips
-        elif transcript is not None:
-            clips_data = get_viral_clips(transcript, duration, viewer_clips=viewer_clips)
+        gta_highlight_mode = os.environ.get("GTA_HIGHLIGHT_MODE", "0").strip() == "1"
+        if gta_highlight_mode:
+            import gta_highlight
+            import gta_highlight_gemini
+
+            print("🎮 GTA Highlight Mode: detecting and verifying gameplay moments...")
+            gta_candidates = gta_highlight.detect_candidates(
+                input_video, duration=duration,
+                min_seconds=15, max_seconds=35,
+                top_k=int(os.environ.get("GTA_CANDIDATE_TOP_K", "8")),
+                threshold=float(os.environ.get("GTA_CANDIDATE_THRESHOLD", "0.28")),
+                sample_fps=2.0,
+            )
+            clips_data = gta_highlight_gemini.review_gta_candidates(
+                input_video, gta_candidates,
+                min_score=int(os.environ.get("GTA_MIN_REVIEW_SCORE", "72")),
+                max_clips=int(os.environ.get("GTA_MAX_CLIPS", "2")),
+            )
+            if not clips_data.get("shorts"):
+                raise RuntimeError(
+                    "GTA review found no moments strong enough to publish."
+                )
         else:
-            clips_data = get_visual_clips(input_video, duration, viewer_clips=viewer_clips)
+            early_clips = (early_state or {}).get("clips") if early_state else None
+            if (transcript is not None and early_clips
+                    and transcript is early_state["transcript"]):
+                print("♻️ Using the clips Gemini picked while the video downloaded.")
+                clips_data = early_clips
+            elif transcript is not None:
+                clips_data = get_viral_clips(transcript, duration, viewer_clips=viewer_clips)
+            else:
+                clips_data = get_visual_clips(input_video, duration, viewer_clips=viewer_clips)
 
         if not clips_data or 'shorts' not in clips_data:
             # Deliberately fail instead of reframing the whole video: that path
